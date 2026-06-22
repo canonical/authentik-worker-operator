@@ -10,7 +10,10 @@ EnvVars: TypeAlias = Mapping[str, Union[str, bool]]
 DEFAULT_WORKER_ENV: dict[str, str | bool] = {
     "AUTHENTIK_ERROR_REPORTING__ENABLED": "false",
     "AUTHENTIK_LOG_LEVEL": "info",
-    # PostgreSQL — populated by DatabaseIntegration
+    # The ak lifecycle script calls `python` which only exists in the venv.
+    # Juju's charm layer uses override:replace, discarding the rock's PATH.
+    "PATH": "/lifecycle:/ak-root/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    # PostgreSQL — populated by DatabaseConfig
     "AUTHENTIK_POSTGRESQL__HOST": "",
     "AUTHENTIK_POSTGRESQL__PORT": "",
     "AUTHENTIK_POSTGRESQL__USER": "",
@@ -18,6 +21,12 @@ DEFAULT_WORKER_ENV: dict[str, str | bool] = {
     "AUTHENTIK_POSTGRESQL__NAME": "",
     # Cluster secret — populated by AuthentikClusterIntegration
     "AUTHENTIK_SECRET_KEY": "",
+    # Update check — always disabled in charm-managed deployments
+    "AUTHENTIK_DISABLE_UPDATE_CHECK": "true",
+    # Proxy
+    "HTTP_PROXY": "",
+    "HTTPS_PROXY": "",
+    "NO_PROXY": "",
 }
 
 

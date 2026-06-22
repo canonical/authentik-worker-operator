@@ -4,55 +4,64 @@
 """Wrappers for charm relation data, implementing EnvVarConvertible."""
 
 import logging
+from dataclasses import dataclass
 
 from charms.authentik_server.v0.authentik_cluster import AuthentikClusterRequirer
 from charms.data_platform_libs.v0.data_interfaces import DatabaseRequires
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 
 from env_vars import EnvVars
 
 logger = logging.getLogger(__name__)
 
 
-class DatabaseIntegration:
-    """Reads PostgreSQL relation data and exposes it as env vars.
+@dataclass(frozen=True, slots=True)
+class DatabaseConfig:
+    """Holds PostgreSQL relation data and exposes it as env vars."""
 
-    Args:
-        database: The DatabaseRequires library object.
-    """
-
-    def __init__(self, database: DatabaseRequires) -> None:
-        self._database = database
-
-    def is_ready(self) -> bool:
-        """Return True if the database relation is present and has endpoint data."""
-        return bool(self._get_connection())
-
-    def _get_connection(self) -> dict[str, str] | None:
-        """Return a connection dict or None if the relation is not ready."""
-        for data in self._database.fetch_relation_data().values():
-            if "endpoints" in data:
-                host, port = data["endpoints"].split(":")
-                return {
-                    "host": host,
-                    "port": port,
-                    "user": data["username"],
-                    "password": data["password"],
-                    "name": data["database"],
-                }
-        return None
+    host: str = ""
+    port: str = ""
+    user: str = ""
+    password: str = ""
+    name: str = ""
 
     def to_env_vars(self) -> EnvVars:
         """Return PostgreSQL connection environment variables."""
-        conn = self._get_connection()
-        if not conn:
-            return {}
         return {
-            "AUTHENTIK_POSTGRESQL__HOST": conn["host"],
-            "AUTHENTIK_POSTGRESQL__PORT": conn["port"],
-            "AUTHENTIK_POSTGRESQL__USER": conn["user"],
-            "AUTHENTIK_POSTGRESQL__PASSWORD": conn["password"],
-            "AUTHENTIK_POSTGRESQL__NAME": conn["name"],
+            "AUTHENTIK_POSTGRESQL__HOST": self.host,
+            "AUTHENTIK_POSTGRESQL__PORT": self.port,
+            "AUTHENTIK_POSTGRESQL__USER": self.user,
+            "AUTHENTIK_POSTGRESQL__PASSWORD": self.password,
+            "AUTHENTIK_POSTGRESQL__NAME": self.name,
         }
+
+    def is_ready(self) -> bool:
+        """Return True when required relation fields are available."""
+        return bool(self.host and self.port and self.user)
+
+    @classmethod
+    def load(cls, database: DatabaseRequires) -> "DatabaseConfig":
+        """Construct DatabaseConfig from relation data.
+
+        Args:
+            database: The DatabaseRequires relation wrapper.
+
+        Returns:
+            A populated DatabaseConfig or a default one if relation data is incomplete.
+        """
+        if not (relations := database.relations):
+            return cls()
+        integration_data = database.fetch_relation_data()[relations[0].id]
+        if "endpoints" not in integration_data:
+            return cls()
+        host, port = integration_data["endpoints"].split(":")
+        return cls(
+            host=host,
+            port=port,
+            user=integration_data.get("username", ""),
+            password=integration_data.get("password", ""),
+            name=integration_data.get("database", ""),
+        )
 
 
 class AuthentikClusterIntegration:
@@ -75,3 +84,25 @@ class AuthentikClusterIntegration:
         if not secret_key:
             return {}
         return {"AUTHENTIK_SECRET_KEY": secret_key}
+
+
+@dataclass(frozen=True, slots=True)
+class TracingData:
+    """Holds tracing endpoint data and exposes it as env vars."""
+
+    is_ready: bool = False
+    endpoint: str = ""
+
+    def to_env_vars(self) -> EnvVars:
+        """Return tracing endpoint environment variables when tracing is ready."""
+        if not self.is_ready:
+            return {}
+        return {"OTEL_EXPORTER_OTLP_ENDPOINT": self.endpoint}
+
+    @classmethod
+    def load(cls, requirer: TracingEndpointRequirer) -> "TracingData":
+        """Construct TracingData from tracing relation data."""
+        if not requirer.is_ready():
+            return cls()
+        endpoint = requirer.get_endpoint("otlp_http")
+        return cls(is_ready=True, endpoint=endpoint or "")

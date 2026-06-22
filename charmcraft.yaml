@@ -1,4 +1,4 @@
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 name: authentik-worker
@@ -54,10 +54,47 @@ config:
         automatically deduced from it).
         See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
       type: string
+    worker_processes:
+      description: |
+        Number of worker processes to start. Each process runs independently and picks up tasks
+        from the PostgreSQL queue. In environments where scaling with multiple replicas is not
+        possible, this can be increased to handle higher loads.
+        Maps to AUTHENTIK_WORKER__PROCESSES.
+      type: int
+      default: 1
+    worker_threads:
+      description: |
+        Number of Dramatiq threads per worker process. A value below 2 is not recommended unless
+        you have multiple worker replicas.
+        Maps to AUTHENTIK_WORKER__THREADS.
+      type: int
+      default: 2
+    task_max_retries:
+      description: |
+        Number of times a failing task will be retried before it is abandoned.
+        Maps to AUTHENTIK_WORKER__TASK_MAX_RETRIES.
+      type: int
+      default: 5
+    task_default_time_limit:
+      description: |
+        Default duration (in seconds) a task can run before it is aborted. Some tasks (e.g. LDAP
+        source sync) will override this with their own limit.
+        Maps to AUTHENTIK_WORKER__TASK_DEFAULT_TIME_LIMIT.
+      type: int
+      default: 600
+    task_expiration_days:
+      description: |
+        How many days completed tasks are kept in the database before they are deleted.
+        Maps to AUTHENTIK_WORKER__TASK_EXPIRATION.
+      type: int
+      default: 30
 
 actions:
 
 requires:
+  authentik-cluster:
+    interface: authentik_cluster
+    optional: true
   logging:
     interface: loki_push_api
     optional: true
@@ -78,14 +115,9 @@ provides:
     optional: true
     description: |
       Provides application metrics to COS Prometheus instance
-  grafana-dashboard:
-    interface: grafana_dashboard
-    optional: true
-    description: |
-      Forwards the built-in grafana dashboard(s) for monitoring tenant-service.
 
 containers:
-  authentik-worker:
+  authentik:
     gid: 584792
     uid: 584792
     resource: oci-image
@@ -94,7 +126,7 @@ resources:
   oci-image:
     type: oci-image
     description: OCI image for authentik-worker
-    upstream-source: ghcr.io/canonical/authentik-worker:v0.2.0
+    upstream-source: ghcr.io/canonical/authentik-server:stable
 
 parts:
   charm:

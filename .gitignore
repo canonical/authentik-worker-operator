@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Testing & Coverage
+.tox/
+.cover/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Charmcraft
+*.charm
+/prime/
+/stage/
+/parts/
+
+# Charmcraft libraries cache
+lib/**/__pycache__/
