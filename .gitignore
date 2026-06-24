@@ -35,3 +35,10 @@ htmlcov/
 
 # Charmcraft libraries cache
 lib/**/__pycache__/
+
+# AI Agent runtimes
+.agent/
+.opencode/
+.agents/skills
+
+

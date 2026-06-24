@@ -68,7 +68,7 @@ All data sources implement `EnvVarConvertible` (`to_env_vars() -> EnvVars`).
 
 Detailed guidelines are in scoped instruction files that load automatically:
 
-- **`tests/` code**: `.github/instructions/testing.instructions.md` — Test file structure, `create_state()` factory, mocking rules.
+- **`tests/` code**: `.agents/instructions/testing.instructions.md` — Test file structure, `create_state()` factory, mocking rules.
 
 <!-- headroom:rtk-instructions -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
