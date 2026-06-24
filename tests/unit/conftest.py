@@ -142,14 +142,17 @@ def cluster_relation_ready(cluster_secret: testing.Secret) -> testing.Relation:
         CLUSTER_RELATION,
         interface="authentik_cluster",
         remote_app_name="authentik-server",
-        remote_app_data={"secret_key_secret_id": cluster_secret.id},
+        remote_app_data={
+            "secret_key_secret_id": cluster_secret.id,
+            "server_version": "2026.2.2",
+        },
     )
 
 
 # ---------------------------------------------------------------------------
 # Charm service mocks
 # ---------------------------------------------------------------------------
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mocked_workload_service_version(mocker: pytest_mock.MockerFixture) -> MagicMock:
     """Mock WorkloadService.version to return a fixed string without exec."""
     return mocker.patch(

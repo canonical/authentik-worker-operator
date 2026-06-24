@@ -4,7 +4,6 @@
 """Constants for the Authentik worker charm."""
 
 WORKLOAD_CONTAINER = "authentik"
-SERVICE_NAME = "authentik-worker"
 WORKLOAD_SERVICE = "authentik-worker"
 COMMAND = "/lifecycle/ak worker"
 PEBBLE_READY_CHECK_NAME = "ready"

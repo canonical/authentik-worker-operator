@@ -31,6 +31,7 @@ from constants import (
     WORKLOAD_PORT,
     WORKLOAD_SERVICE,
 )
+from exceptions import PebbleError
 from integrations import AuthentikClusterIntegration, DatabaseConfig, TracingData
 from services import PebbleService, WorkloadService
 from utils import (
@@ -96,7 +97,9 @@ class AuthentikWorkerCharm(ops.CharmBase):
         self.framework.observe(self.database.on.database_created, self._on_holistic_handler)
         self.framework.observe(self.database.on.endpoints_changed, self._on_holistic_handler)
         self.framework.observe(self.cluster.on.cluster_changed, self._on_holistic_handler)
-        self.framework.observe(self.cluster.on.cluster_removed, self._on_cluster_integration_broken)
+        self.framework.observe(
+            self.cluster.on.cluster_removed, self._on_cluster_integration_broken
+        )
         self.framework.observe(
             self.tracing_requirer.on.endpoint_changed, self._on_holistic_handler
         )
@@ -118,18 +121,18 @@ class AuthentikWorkerCharm(ops.CharmBase):
         """Return True if the worker's workload version matches the server's.
 
         Returns True (unblocked) when:
-        - The server has not yet published its version (still starting up).
-        - Both versions are identical.
-        Returns False when versions are known and differ.
+        - Both versions are identical and known.
+        Returns False when versions are unknown or differ.
         """
         server_version = self.cluster.get_server_version()
-        if not server_version:
-            # Server hasn't published its version yet — don't block, just wait.
-            return True
         worker_version = self._workload_service.version
-        if not worker_version:
-            # Worker binary not reachable yet — don't block.
-            return True
+        if not server_version or not worker_version:
+            logger.info(
+                "Versions not yet fully known: server_version=%s, worker_version=%s",
+                server_version,
+                worker_version,
+            )
+            return False
         return server_version == worker_version
 
     def _holistic_handler(self, event: ops.EventBase) -> None:
@@ -151,7 +154,10 @@ class AuthentikWorkerCharm(ops.CharmBase):
             self._cluster_integration,
             self._config,
         )
-        self._pebble.plan(layer)
+        try:
+            self._pebble.plan(layer)
+        except PebbleError as e:
+            logger.error("Failed to plan pebble layer: %s", e)
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
         """Build resource requirements from charm config."""
@@ -210,9 +216,7 @@ class AuthentikWorkerCharm(ops.CharmBase):
 
         if not database_integration_exists(self):
             event.add_status(ops.BlockedStatus("missing pg-database relation"))
-        elif not DatabaseConfig.load(self.database).is_ready() or not database_resource_is_created(
-            self
-        ):
+        elif not database_resource_is_created(self):
             event.add_status(ops.WaitingStatus("waiting for pg-database relation"))
 
         if not cluster_integration_exists(self):

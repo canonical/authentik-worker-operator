@@ -10,7 +10,7 @@ from ops import StatusBase, testing
 from pytest_mock import MockerFixture
 from unit.conftest import create_state
 
-from constants import CLUSTER_RELATION, DATABASE_RELATION, SERVICE_NAME, WORKLOAD_CONTAINER
+from constants import CLUSTER_RELATION, DATABASE_RELATION, WORKLOAD_CONTAINER, WORKLOAD_SERVICE
 
 
 class TestPebbleReadyEvent:
@@ -355,7 +355,7 @@ class TestDatabaseIntegrationBroken:
 
         context.run(context.on.relation_broken(db_relation), state)
 
-        mock_stop.assert_called_once_with(SERVICE_NAME)
+        mock_stop.assert_called_once_with(WORKLOAD_SERVICE)
 
     def test_when_container_not_connected_does_not_raise(
         self,

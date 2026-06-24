@@ -18,10 +18,6 @@ class CharmConfig:
     def __init__(self, config: ConfigData) -> None:
         self._config = config
 
-    def get_missing_config_keys(self) -> list:
-        """Return a list of required config keys that are missing or empty."""
-        return []
-
     def to_env_vars(self) -> EnvVars:
         """Return charm-config-derived environment variables."""
         env_vars: dict[str, str] = {
