@@ -11,7 +11,7 @@ import pytest_mock
 from ops import testing
 
 from charm import AuthentikWorkerCharm
-from constants import CLUSTER_RELATION, DATABASE_RELATION, WORKLOAD_CONTAINER
+from constants import CLUSTER_RELATION, WORKLOAD_CONTAINER
 
 
 # ---------------------------------------------------------------------------
@@ -104,22 +104,6 @@ def container() -> testing.Container:
 # Relation fixtures
 # ---------------------------------------------------------------------------
 @pytest.fixture
-def db_relation() -> testing.Relation:
-    """Return a pg-database relation with canonical test credentials."""
-    return testing.Relation(
-        DATABASE_RELATION,
-        interface="postgresql_client",
-        remote_app_name="postgresql",
-        remote_app_data={
-            "database": "authentik",
-            "endpoints": "test-host:5432",
-            "username": "test-user",
-            "password": "test-pass",
-        },
-    )
-
-
-@pytest.fixture
 def cluster_relation() -> testing.Relation:
     """Return an authentik-cluster relation without remote data (not yet ready)."""
     return testing.Relation(
@@ -131,8 +115,18 @@ def cluster_relation() -> testing.Relation:
 
 @pytest.fixture
 def cluster_secret() -> testing.Secret:
-    """Return the Juju secret carrying the authentik secret key."""
-    return testing.Secret({"secret-key": "test-secret-key"}, id="secret:abc123")
+    """Return the Juju secret carrying the authentik secret key and database config."""
+    return testing.Secret(
+        {
+            "secret-key": "test-secret-key",
+            "db-host": "test-host",
+            "db-port": "5432",
+            "db-user": "test-user",
+            "db-password": "test-pass",
+            "db-name": "authentik",
+        },
+        id="secret:abc123",
+    )
 
 
 @pytest.fixture
@@ -200,30 +194,9 @@ def mocked_container_connectivity(mocker: pytest_mock.MockerFixture) -> MagicMoc
 
 
 @pytest.fixture
-def mocked_database_integration_exists(mocker: pytest_mock.MockerFixture) -> MagicMock:
-    """Mock database_integration_exists condition to return True."""
-    return mocker.patch("charm.database_integration_exists", return_value=True)
-
-
-@pytest.fixture
-def mocked_database_resource_is_created(mocker: pytest_mock.MockerFixture) -> MagicMock:
-    """Mock database_resource_is_created condition to return True."""
-    return mocker.patch("charm.database_resource_is_created", return_value=True)
-
-
-@pytest.fixture
 def mocked_cluster_integration_exists(mocker: pytest_mock.MockerFixture) -> MagicMock:
     """Mock cluster_integration_exists condition to return True."""
     return mocker.patch("charm.cluster_integration_exists", return_value=True)
-
-
-@pytest.fixture
-def mocked_database_config_load(mocker: pytest_mock.MockerFixture) -> MagicMock:
-    """Mock DatabaseConfig.load to return a ready config without real relation data."""
-    mock_config = MagicMock()
-    mock_config.is_ready.return_value = True
-    mock_config.to_env_vars.return_value = {}
-    return mocker.patch("charm.DatabaseConfig.load", return_value=mock_config)
 
 
 @pytest.fixture
@@ -235,10 +208,7 @@ def mocked_cluster_integration_is_ready(mocker: pytest_mock.MockerFixture) -> Ma
 @pytest.fixture
 def all_satisfied_conditions(
     mocked_container_connectivity: MagicMock,
-    mocked_database_integration_exists: MagicMock,
-    mocked_database_resource_is_created: MagicMock,
     mocked_cluster_integration_exists: MagicMock,
-    mocked_database_config_load: MagicMock,
     mocked_cluster_integration_is_ready: MagicMock,
     mocked_is_running: MagicMock,
     mocked_is_failing: MagicMock,

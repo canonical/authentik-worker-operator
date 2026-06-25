@@ -10,7 +10,7 @@ from ops import StatusBase, testing
 from pytest_mock import MockerFixture
 from unit.conftest import create_state
 
-from constants import CLUSTER_RELATION, DATABASE_RELATION, WORKLOAD_CONTAINER, WORKLOAD_SERVICE
+from constants import CLUSTER_RELATION, WORKLOAD_CONTAINER, WORKLOAD_SERVICE
 
 
 class TestPebbleReadyEvent:
@@ -90,18 +90,6 @@ class TestEventRouting:
 
         mocked_holistic_handler.assert_called_once()
 
-    def test_database_created_calls_holistic_handler(
-        self,
-        context: testing.Context,
-        mocked_holistic_handler: MagicMock,
-        db_relation: testing.Relation,
-    ) -> None:
-        state = create_state(relations=[db_relation])
-
-        context.run(context.on.relation_changed(db_relation), state)
-
-        mocked_holistic_handler.assert_called_once()
-
     def test_cluster_changed_calls_holistic_handler(
         self,
         context: testing.Context,
@@ -125,38 +113,40 @@ class TestHolisticHandler:
     def test_when_pebble_not_ready_skips_planning(
         self,
         context: testing.Context,
-        db_relation: testing.Relation,
-        cluster_relation: testing.Relation,
+        cluster_relation_ready: testing.Relation,
+        cluster_secret: testing.Secret,
     ) -> None:
         """Reconciliation exits early when pebble container is not connectable."""
-        state = create_state(can_connect=False, relations=[db_relation, cluster_relation])
+        state = create_state(
+            can_connect=False, relations=[cluster_relation_ready], secrets=[cluster_secret]
+        )
 
         state_out = context.run(context.on.config_changed(), state)
 
         assert not state_out.get_container(WORKLOAD_CONTAINER).plan.services
 
-    def test_when_db_relation_missing_skips_planning(
+    def test_when_db_config_missing_skips_planning(
         self,
         context: testing.Context,
-        cluster_relation: testing.Relation,
+        cluster_relation_ready: testing.Relation,
     ) -> None:
-        """Reconciliation exits early when database relation is absent."""
-        state = create_state(relations=[cluster_relation])
+        """Reconciliation exits early when cluster is ready but database config is missing from the secret."""
+        empty_secret = testing.Secret({"secret-key": "test-secret-key"}, id="secret:abc123")
+        state = create_state(relations=[cluster_relation_ready], secrets=[empty_secret])
 
         state_out = context.run(context.on.config_changed(), state)
 
-        assert isinstance(state_out.unit_status, testing.BlockedStatus)
+        assert not state_out.get_container(WORKLOAD_CONTAINER).plan.services
 
     def test_when_all_ready_plans_pebble_layer(
         self,
         context: testing.Context,
-        db_relation: testing.Relation,
         cluster_relation_ready: testing.Relation,
         cluster_secret: testing.Secret,
     ) -> None:
         """Reconciliation produces a non-empty Pebble plan when all guards pass."""
         state = create_state(
-            relations=[db_relation, cluster_relation_ready],
+            relations=[cluster_relation_ready],
             secrets=[cluster_secret],
         )
 
@@ -167,7 +157,6 @@ class TestHolisticHandler:
     def test_when_version_mismatch_skips_planning(
         self,
         context: testing.Context,
-        db_relation: testing.Relation,
         cluster_secret: testing.Secret,
         mocked_workload_service_version: MagicMock,
     ) -> None:
@@ -183,7 +172,7 @@ class TestHolisticHandler:
             },
         )
         state = create_state(
-            relations=[db_relation, cluster_rel_with_version],
+            relations=[cluster_rel_with_version],
             secrets=[cluster_secret],
         )
 
@@ -216,12 +205,6 @@ class TestCollectStatusEvent:
                 "waiting for pebble",
             ),
             (
-                "database_integration_exists",
-                False,
-                testing.BlockedStatus,
-                f"missing {DATABASE_RELATION} relation",
-            ),
-            (
                 "cluster_integration_exists",
                 False,
                 testing.BlockedStatus,
@@ -230,7 +213,6 @@ class TestCollectStatusEvent:
         ],
         ids=[
             "container_not_connected",
-            "db_relation_missing",
             "cluster_relation_missing",
         ],
     )
@@ -254,25 +236,26 @@ class TestCollectStatusEvent:
     def test_when_db_data_absent_adds_waiting_status(
         self,
         context: testing.Context,
-        all_satisfied_conditions: None,
+        cluster_relation_ready: testing.Relation,
     ) -> None:
-        """WaitingStatus when relation exists but provider has not published data yet."""
-        state = create_state()
+        """WaitingStatus when cluster relation exists but database config is missing from the secret."""
+        empty_secret = testing.Secret({"secret-key": "test-secret-key"}, id="secret:abc123")
+        state = create_state(relations=[cluster_relation_ready], secrets=[empty_secret])
 
-        with patch("charm.database_resource_is_created", return_value=False):
-            state_out = context.run(context.on.collect_unit_status(), state)
+        state_out = context.run(context.on.collect_unit_status(), state)
 
-        assert state_out.unit_status == testing.WaitingStatus("waiting for pg-database relation")
+        assert state_out.unit_status == testing.WaitingStatus(
+            "waiting for database config from server"
+        )
 
     def test_when_cluster_data_absent_adds_waiting_status(
         self,
         context: testing.Context,
-        db_relation: testing.Relation,
         cluster_relation: testing.Relation,
         all_satisfied_conditions: None,
     ) -> None:
         """WaitingStatus when cluster relation exists but secret key not yet published."""
-        state = create_state(relations=[db_relation, cluster_relation])
+        state = create_state(relations=[cluster_relation])
 
         with patch("charm.cluster_integration_exists", return_value=True), patch(
             "charm.AuthentikClusterIntegration.is_ready", return_value=False
@@ -340,29 +323,29 @@ class TestCollectStatusEvent:
         assert "version mismatch" in state_out.unit_status.message
 
 
-class TestDatabaseIntegrationBroken:
-    """Tests for database relation-broken side effects."""
+class TestClusterIntegrationBroken:
+    """Tests for cluster relation-broken side effects."""
 
-    def test_stops_service_when_db_relation_broken(
+    def test_stops_service_when_cluster_relation_broken(
         self,
         context: testing.Context,
-        db_relation: testing.Relation,
+        cluster_relation: testing.Relation,
         mocker: MockerFixture,
     ) -> None:
-        """Database relation-broken event stops the workload service."""
+        """Cluster relation-broken event stops the workload service."""
         mock_stop = mocker.patch("ops.model.Container.stop")
-        state = create_state(relations=[db_relation])
+        state = create_state(relations=[cluster_relation])
 
-        context.run(context.on.relation_broken(db_relation), state)
+        context.run(context.on.relation_broken(cluster_relation), state)
 
         mock_stop.assert_called_once_with(WORKLOAD_SERVICE)
 
     def test_when_container_not_connected_does_not_raise(
         self,
         context: testing.Context,
-        db_relation: testing.Relation,
+        cluster_relation: testing.Relation,
     ) -> None:
-        """Database relation-broken with disconnected container completes without error."""
-        state = create_state(relations=[db_relation], can_connect=False)
+        """Cluster relation-broken with disconnected container completes without error."""
+        state = create_state(relations=[cluster_relation], can_connect=False)
 
-        context.run(context.on.relation_broken(db_relation), state)
+        context.run(context.on.relation_broken(cluster_relation), state)

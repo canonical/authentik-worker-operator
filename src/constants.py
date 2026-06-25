@@ -10,7 +10,7 @@ PEBBLE_READY_CHECK_NAME = "ready"
 WORKLOAD_PORT: int = 9000
 HTTP_PORT: int = WORKLOAD_PORT
 
-DATABASE_RELATION = "pg-database"
+
 CLUSTER_RELATION = "authentik-cluster"
 LOGGING_RELATION = "logging"
 TRACING_RELATION = "tracing"

@@ -104,10 +104,7 @@ requires:
     optional: true
     description: |
       Provides traces to COS Tempo instance
-  pg-database:
-    interface: postgresql_client
-    optional: false
-    limit: 1
+
 
 provides:
   metrics-endpoint:

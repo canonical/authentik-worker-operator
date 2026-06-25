@@ -38,7 +38,7 @@ PEBBLE_LAYER_DICT: LayerDict = {
         "alive": {
             "override": "replace",
             "level": "alive",
-            "threshold": 60,
+            "threshold": 10,
             "http": {
                 "url": f"http://localhost:{HTTP_PORT}/-/health/live/",
             },
@@ -46,7 +46,7 @@ PEBBLE_LAYER_DICT: LayerDict = {
         PEBBLE_READY_CHECK_NAME: {
             "override": "replace",
             "level": "ready",
-            "threshold": 60,
+            "threshold": 10,
             "http": {
                 "url": f"http://localhost:{HTTP_PORT}/-/health/ready/",
             },
@@ -156,11 +156,17 @@ class WorkloadService:
         return c.status == CheckStatus.UP
 
     def is_failing(self) -> bool:
-        """Return True when service is running and the ready check is down."""
+        """Return True when service is failing, crashlooping, or the ready check is down."""
         try:
             service = self._container.get_service(WORKLOAD_SERVICE)
         except (ModelError, PebbleConnectionError):
             return False
+
+        current_str = (
+            service.current.value if hasattr(service.current, "value") else service.current
+        )
+        if str(current_str).lower() in ("backoff", "error"):
+            return True
 
         if not service.is_running():
             return False

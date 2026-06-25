@@ -7,61 +7,11 @@ import logging
 from dataclasses import dataclass
 
 from charms.authentik_server.v0.authentik_cluster import AuthentikClusterRequirer
-from charms.data_platform_libs.v0.data_interfaces import DatabaseRequires
 from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 
 from env_vars import EnvVars
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class DatabaseConfig:
-    """Holds PostgreSQL relation data and exposes it as env vars."""
-
-    host: str = ""
-    port: str = ""
-    user: str = ""
-    password: str = ""
-    name: str = ""
-
-    def to_env_vars(self) -> EnvVars:
-        """Return PostgreSQL connection environment variables."""
-        return {
-            "AUTHENTIK_POSTGRESQL__HOST": self.host,
-            "AUTHENTIK_POSTGRESQL__PORT": self.port,
-            "AUTHENTIK_POSTGRESQL__USER": self.user,
-            "AUTHENTIK_POSTGRESQL__PASSWORD": self.password,
-            "AUTHENTIK_POSTGRESQL__NAME": self.name,
-        }
-
-    def is_ready(self) -> bool:
-        """Return True when required relation fields are available."""
-        return bool(self.host and self.port and self.user)
-
-    @classmethod
-    def load(cls, database: DatabaseRequires) -> "DatabaseConfig":
-        """Construct DatabaseConfig from relation data.
-
-        Args:
-            database: The DatabaseRequires relation wrapper.
-
-        Returns:
-            A populated DatabaseConfig or a default one if relation data is incomplete.
-        """
-        if not (relations := database.relations):
-            return cls()
-        integration_data = database.fetch_relation_data()[relations[0].id]
-        if "endpoints" not in integration_data:
-            return cls()
-        host, port = integration_data["endpoints"].split(":")
-        return cls(
-            host=host,
-            port=port,
-            user=integration_data.get("username", ""),
-            password=integration_data.get("password", ""),
-            name=integration_data.get("database", ""),
-        )
 
 
 class AuthentikClusterIntegration:
@@ -75,15 +25,27 @@ class AuthentikClusterIntegration:
         self._cluster = cluster
 
     def is_ready(self) -> bool:
-        """Return True if the cluster relation is ready and the secret key is available."""
-        return self._cluster.is_ready()
+        """Return True if the cluster relation is ready and all credentials are available."""
+        return bool(self._cluster.get_secret_key() and self._cluster.get_database_config())
+
+    def is_database_config_ready(self) -> bool:
+        """Return True if the database configuration is available."""
+        return self._cluster.get_database_config() is not None
 
     def to_env_vars(self) -> EnvVars:
-        """Return the secret key environment variable."""
+        """Return the secret key and database environment variables."""
         secret_key = self._cluster.get_secret_key()
-        if not secret_key:
+        cfg = self._cluster.get_database_config()
+        if not secret_key or not cfg:
             return {}
-        return {"AUTHENTIK_SECRET_KEY": secret_key}
+        return {
+            "AUTHENTIK_SECRET_KEY": secret_key,
+            "AUTHENTIK_POSTGRESQL__HOST": cfg.get("db-host", ""),
+            "AUTHENTIK_POSTGRESQL__PORT": cfg.get("db-port", ""),
+            "AUTHENTIK_POSTGRESQL__USER": cfg.get("db-user", ""),
+            "AUTHENTIK_POSTGRESQL__PASSWORD": cfg.get("db-password", ""),
+            "AUTHENTIK_POSTGRESQL__NAME": cfg.get("db-name", ""),
+        }
 
 
 @dataclass(frozen=True, slots=True)

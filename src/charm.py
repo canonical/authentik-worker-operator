@@ -8,7 +8,6 @@ import logging
 
 import ops
 from charms.authentik_server.v0.authentik_cluster import AuthentikClusterRequirer
-from charms.data_platform_libs.v0.data_interfaces import DatabaseRequires
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
@@ -22,7 +21,6 @@ from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 from configs import CharmConfig
 from constants import (
     CLUSTER_RELATION,
-    DATABASE_RELATION,
     LOGGING_RELATION,
     METRICS_RELATION,
     PEBBLE_READY_CHECK_NAME,
@@ -32,14 +30,12 @@ from constants import (
     WORKLOAD_SERVICE,
 )
 from exceptions import PebbleError
-from integrations import AuthentikClusterIntegration, DatabaseConfig, TracingData
+from integrations import AuthentikClusterIntegration, TracingData
 from services import PebbleService, WorkloadService
 from utils import (
     NOOP_CONDITIONS,
     cluster_integration_exists,
     container_connectivity,
-    database_integration_exists,
-    database_resource_is_created,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,9 +52,6 @@ class AuthentikWorkerCharm(ops.CharmBase):
         self._workload_service = WorkloadService(self.unit)
         self._config = CharmConfig(self.config)
 
-        self.database = DatabaseRequires(
-            self, relation_name=DATABASE_RELATION, database_name="authentik"
-        )
         self.cluster = AuthentikClusterRequirer(self, relation_name=CLUSTER_RELATION)
         self.log_forwarder = LogForwarder(self, relation_name=LOGGING_RELATION)
         self.metrics_endpoint = MetricsEndpointProvider(
@@ -91,11 +84,6 @@ class AuthentikWorkerCharm(ops.CharmBase):
         self.framework.observe(
             self.on.authentik_pebble_check_recovered, self._on_pebble_check_recovered
         )
-        self.framework.observe(
-            self.on[DATABASE_RELATION].relation_broken, self._on_database_integration_broken
-        )
-        self.framework.observe(self.database.on.database_created, self._on_holistic_handler)
-        self.framework.observe(self.database.on.endpoints_changed, self._on_holistic_handler)
         self.framework.observe(self.cluster.on.cluster_changed, self._on_holistic_handler)
         self.framework.observe(
             self.cluster.on.cluster_removed, self._on_cluster_integration_broken
@@ -140,17 +128,8 @@ class AuthentikWorkerCharm(ops.CharmBase):
         if not all(condition(self) for condition in NOOP_CONDITIONS):
             return
 
-        if not self._cluster_integration.is_ready():
-            return
-
-        if not self._check_version_match():
-            return
-
-        database_config = DatabaseConfig.load(self.database)
-
         layer = self._pebble.render_pebble_layer(
             TracingData.load(self.tracing_requirer),
-            database_config,
             self._cluster_integration,
             self._config,
         )
@@ -192,14 +171,6 @@ class AuthentikWorkerCharm(ops.CharmBase):
         if event.info.name == PEBBLE_READY_CHECK_NAME:
             logger.info("Workload check recovered: %s", event.info.name)
 
-    def _on_database_integration_broken(self, event: ops.RelationBrokenEvent) -> None:
-        """Stop service when database integration is removed."""
-        if self._container.can_connect():
-            try:
-                self._container.stop(WORKLOAD_SERVICE)
-            except ops.pebble.Error:
-                logger.warning("Failed to stop workload after database relation broken")
-
     def _on_cluster_integration_broken(self, event: ops.RelationBrokenEvent) -> None:
         """Stop service when authentik-cluster integration is removed."""
         if self._container.can_connect():
@@ -208,30 +179,47 @@ class AuthentikWorkerCharm(ops.CharmBase):
             except ops.pebble.Error:
                 logger.warning("Failed to stop workload after cluster relation broken")
 
+    def _check_db_status(self) -> ops.StatusBase:
+        """Check database integration status."""
+        if self._cluster_integration.is_ready():
+            return ops.ActiveStatus()
+
+        # If the cluster relation itself is ready, but database config specifically is missing
+        if self.cluster.is_ready() and not self._cluster_integration.is_database_config_ready():
+            return ops.WaitingStatus("waiting for database config from server")
+        return ops.ActiveStatus()
+
+    def _check_cluster_status(self) -> ops.StatusBase:
+        """Check cluster integration status."""
+        if not cluster_integration_exists(self):
+            return ops.BlockedStatus("missing authentik-cluster relation")
+
+        if not self._cluster_integration.is_ready():
+            # If the database config specifically is missing, let db_status handle it
+            if (
+                self.cluster.is_ready()
+                and not self._cluster_integration.is_database_config_ready()
+            ):
+                return ops.ActiveStatus()
+            return ops.WaitingStatus("waiting for authentik-cluster data")
+
+        server_version = self.cluster.get_server_version()
+        worker_version = self._workload_service.version
+        if server_version and worker_version and server_version != worker_version:
+            return ops.BlockedStatus(
+                f"version mismatch: server={server_version}, worker={worker_version}"
+            )
+
+        return ops.ActiveStatus()
+
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Report unit status."""
         can_connect = container_connectivity(self)
         if not can_connect:
             event.add_status(ops.WaitingStatus("waiting for pebble"))
 
-        if not database_integration_exists(self):
-            event.add_status(ops.BlockedStatus("missing pg-database relation"))
-        elif not database_resource_is_created(self):
-            event.add_status(ops.WaitingStatus("waiting for pg-database relation"))
-
-        if not cluster_integration_exists(self):
-            event.add_status(ops.BlockedStatus("missing authentik-cluster relation"))
-        elif not self._cluster_integration.is_ready():
-            event.add_status(ops.WaitingStatus("waiting for authentik-cluster data"))
-        else:
-            server_version = self.cluster.get_server_version()
-            worker_version = self._workload_service.version
-            if server_version and worker_version and server_version != worker_version:
-                event.add_status(
-                    ops.BlockedStatus(
-                        f"version mismatch: server={server_version}, worker={worker_version}"
-                    )
-                )
+        event.add_status(self._check_db_status())
+        event.add_status(self._check_cluster_status())
 
         if (
             can_connect
@@ -245,6 +233,8 @@ class AuthentikWorkerCharm(ops.CharmBase):
             elif not self._workload_service.is_running():
                 event.add_status(ops.WaitingStatus("waiting for service to start"))
 
+        if patch_status := self.resources_patch.get_status():
+            event.add_status(patch_status)
         event.add_status(ops.ActiveStatus())
 
 

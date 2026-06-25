@@ -27,7 +27,7 @@ from integration.utils import (
     unit_number,
 )
 
-from src.constants import CLUSTER_RELATION, DATABASE_RELATION
+from src.constants import CLUSTER_RELATION
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,6 @@ def test_scale_up(juju: jubilant.Juju) -> None:
 @pytest.mark.parametrize(
     "remote_app_name,integration_name,is_status",
     [
-        (DB_APP, DATABASE_RELATION, is_blocked),
         (SERVER_APP, CLUSTER_RELATION, is_blocked),
     ],
 )
