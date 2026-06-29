@@ -4,8 +4,14 @@
 """Constants for the Authentik worker charm."""
 
 WORKLOAD_CONTAINER = "authentik"
-SERVICE_NAME = "authentik-worker"
-COMMAND = "ak worker"
+WORKLOAD_SERVICE = "authentik-worker"
+COMMAND = "/lifecycle/ak worker"
+PEBBLE_READY_CHECK_NAME = "ready"
+WORKLOAD_PORT: int = 9000
+HTTP_PORT: int = WORKLOAD_PORT
 
-DATABASE_RELATION = "pg-database"
+
 CLUSTER_RELATION = "authentik-cluster"
+LOGGING_RELATION = "logging"
+TRACING_RELATION = "tracing"
+METRICS_RELATION = "metrics-endpoint"

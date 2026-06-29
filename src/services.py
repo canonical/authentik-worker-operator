@@ -6,32 +6,51 @@
 import copy
 import logging
 
-from ops import Unit
+from ops import ModelError, Unit
+from ops.pebble import CheckStatus
+from ops.pebble import ConnectionError as PebbleConnectionError
 from ops.pebble import Layer, LayerDict
 
-from constants import SERVICE_NAME, WORKLOAD_CONTAINER
+from constants import (
+    COMMAND,
+    HTTP_PORT,
+    PEBBLE_READY_CHECK_NAME,
+    WORKLOAD_CONTAINER,
+    WORKLOAD_SERVICE,
+)
 from env_vars import DEFAULT_WORKER_ENV, EnvVarConvertible
 from exceptions import PebbleError
 
 logger = logging.getLogger(__name__)
 
 PEBBLE_LAYER_DICT: LayerDict = {
+    "summary": "authentik-worker-operator layer",
+    "description": "pebble config layer for authentik-worker-operator",
     "services": {
-        SERVICE_NAME: {
+        WORKLOAD_SERVICE: {
             "override": "replace",
             "summary": "Authentik worker",
-            "command": "ak worker",
-            "startup": "enabled",
+            "command": COMMAND,
+            "startup": "disabled",
         }
     },
     "checks": {
-        "health": {
+        "alive": {
             "override": "replace",
             "level": "alive",
-            "exec": {
-                "command": "ak healthcheck",
+            "threshold": 10,
+            "http": {
+                "url": f"http://localhost:{HTTP_PORT}/-/health/live/",
             },
-        }
+        },
+        PEBBLE_READY_CHECK_NAME: {
+            "override": "replace",
+            "level": "ready",
+            "threshold": 10,
+            "http": {
+                "url": f"http://localhost:{HTTP_PORT}/-/health/ready/",
+            },
+        },
     },
 }
 
@@ -57,9 +76,12 @@ class PebbleService:
         Raises:
             PebbleError: If the service fails to start.
         """
-        self._container.add_layer(SERVICE_NAME, layer, combine=True)
+        self._container.add_layer(WORKLOAD_SERVICE, layer, combine=True)
         try:
-            self._container.replan()
+            if not self._container.get_service(WORKLOAD_SERVICE).is_running():
+                self._container.start(WORKLOAD_SERVICE)
+            else:
+                self._container.replan()
         except Exception as e:
             raise PebbleError(f"Pebble failed to replan the workload service. Error: {e}")
 
@@ -79,5 +101,77 @@ class PebbleService:
         env_vars: dict[str, str | bool] = dict(DEFAULT_WORKER_ENV)
         for source in env_var_sources:
             env_vars.update(source.to_env_vars())
-        self._layer_dict["services"][SERVICE_NAME]["environment"] = env_vars
+        self._layer_dict["services"][WORKLOAD_SERVICE]["environment"] = env_vars
         return Layer(self._layer_dict)
+
+
+class WorkloadService:
+    """Service helper for runtime interactions with the workload."""
+
+    def __init__(self, unit: Unit) -> None:
+        self._unit = unit
+        self._container = unit.get_container(WORKLOAD_CONTAINER)
+
+    @property
+    def version(self) -> str:
+        """Workload version reported by the binary, or empty on failure."""
+        try:
+            process = self._container.exec(
+                [
+                    "/ak-root/.venv/bin/python",
+                    "-c",
+                    "from authentik import VERSION; print(VERSION)",
+                ],
+                environment={"PYTHONPATH": "/"},
+            )
+            return process.wait_output()[0].strip()
+        except Exception:
+            return ""
+
+    def set_version(self) -> None:
+        """Set the workload version on the unit, logging failures without raising."""
+        try:
+            self._unit.set_workload_version(self.version)
+        except Exception as e:
+            logger.error("Failed to set workload version: %s", e)
+
+    def open_port(self) -> None:
+        """Open workload HTTP port."""
+        self._unit.open_port(protocol="tcp", port=HTTP_PORT)
+
+    def is_running(self) -> bool:
+        """Return True when service is running and the ready check is up."""
+        try:
+            service = self._container.get_service(WORKLOAD_SERVICE)
+        except (ModelError, PebbleConnectionError) as e:
+            logger.error("Failed to get pebble service: %s", e)
+            return False
+
+        if not service.is_running():
+            return False
+
+        c = self._container.get_checks().get(PEBBLE_READY_CHECK_NAME)
+        if not c:
+            return False
+        return c.status == CheckStatus.UP
+
+    def is_failing(self) -> bool:
+        """Return True when service is failing, crashlooping, or the ready check is down."""
+        try:
+            service = self._container.get_service(WORKLOAD_SERVICE)
+        except (ModelError, PebbleConnectionError):
+            return False
+
+        current_str = (
+            service.current.value if hasattr(service.current, "value") else service.current
+        )
+        if str(current_str).lower() in ("backoff", "error"):
+            return True
+
+        if not service.is_running():
+            return False
+
+        c = self._container.get_checks().get(PEBBLE_READY_CHECK_NAME)
+        if not c:
+            return False
+        return c.status == CheckStatus.DOWN

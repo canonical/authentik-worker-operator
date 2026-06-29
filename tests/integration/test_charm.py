@@ -1,35 +1,134 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
-#
-# The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
-# To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
 import logging
-import pathlib
+from pathlib import Path
+from typing import Callable
 
 import jubilant
 import pytest
-import yaml
+import requests
+from integration.conftest import integrate_dependencies
+from integration.constants import (
+    APP_IMAGE,
+    APP_NAME,
+    DB_APP,
+    DB_CHANNEL,
+    SERVER_APP,
+    SERVER_CHANNEL,
+)
+from integration.utils import (
+    StatusPredicate,
+    all_active,
+    and_,
+    any_error,
+    is_blocked,
+    remove_integration,
+    unit_number,
+)
+
+from src.constants import CLUSTER_RELATION
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
+
+@pytest.mark.juju_setup
+def test_build_and_deploy(juju: jubilant.Juju, charm: Path) -> None:
+    """Build and deploy the charm-under-test together with related charms."""
+    juju.deploy(
+        DB_APP,
+        channel=DB_CHANNEL,
+        trust=True,
+    )
+    juju.deploy(
+        SERVER_APP,
+        channel=SERVER_CHANNEL,
+        trust=True,
+    )
+    juju.deploy(
+        str(charm),
+        app=APP_NAME,
+        resources={"oci-image": APP_IMAGE},
+        trust=True,
+    )
+
+    integrate_dependencies(juju)
+
+    juju.wait(
+        ready=all_active(APP_NAME, DB_APP, SERVER_APP),
+        error=any_error(APP_NAME, DB_APP, SERVER_APP),
+        timeout=15 * 60,
+    )
 
 
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Deploy the charm under test."""
-    resources = {
-        "some-container-image": METADATA["resources"]["some-container-image"]["upstream-source"]
-    }
-    juju.deploy(charm.resolve(), app="authentik-worker", resources=resources)
-    juju.wait(jubilant.all_active)
+def test_workload_is_running(
+    juju: jubilant.Juju,
+    public_address: str,
+    http_client: requests.Session,
+) -> None:
+    """Test the workload health endpoint is reachable."""
+    resp = http_client.get(f"http://{public_address}:9000/-/health/live/")
+    resp.raise_for_status()
 
 
-# If you implement authentik_worker.get_version in the charm source,
-# remove the @pytest.mark.skip line to enable this test.
-# Alternatively, remove this test if you don't need it.
-@pytest.mark.skip(reason="authentik_worker.get_version is not implemented")
-def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
-    """Check that the correct version of the workload is running."""
-    version = juju.status().apps["authentik-worker"].version
-    assert version == "3.14"  # Replace 3.14 by the expected version of the workload.
+def test_scale_up(juju: jubilant.Juju) -> None:
+    """Test scaling up to verify HA and leader election."""
+    target_unit_number = 2
+    juju.cli("scale-application", APP_NAME, str(target_unit_number))
+
+    juju.wait(
+        ready=and_(
+            all_active(APP_NAME),
+            unit_number(APP_NAME, target_unit_number),
+        ),
+        error=any_error(APP_NAME),
+        timeout=5 * 60,
+    )
+
+
+@pytest.mark.parametrize(
+    "remote_app_name,integration_name,is_status",
+    [
+        (SERVER_APP, CLUSTER_RELATION, is_blocked),
+    ],
+)
+def test_remove_integration(
+    juju: jubilant.Juju,
+    remote_app_name: str,
+    integration_name: str,
+    is_status: Callable[[str], StatusPredicate],
+) -> None:
+    """Test removing and re-adding a required integration."""
+    with remove_integration(juju, remote_app_name, integration_name):
+        juju.wait(
+            ready=is_status(APP_NAME),
+            error=any_error(APP_NAME),
+            timeout=10 * 60,
+        )
+    juju.wait(
+        ready=all_active(APP_NAME, remote_app_name),
+        error=any_error(APP_NAME, remote_app_name),
+        timeout=10 * 60,
+    )
+
+
+def test_scale_down(juju: jubilant.Juju) -> None:
+    """Test scaling down to verify cluster stability."""
+    target_unit_num = 1
+    juju.cli("scale-application", APP_NAME, str(target_unit_num))
+
+    juju.wait(
+        ready=and_(
+            all_active(APP_NAME),
+            unit_number(APP_NAME, target_unit_num),
+        ),
+        error=any_error(APP_NAME),
+        timeout=5 * 60,
+    )
+
+
+@pytest.mark.juju_teardown
+def test_remove_application(juju: jubilant.Juju) -> None:
+    """Test removing the application."""
+    juju.remove_application(APP_NAME, destroy_storage=True)
+    juju.wait(lambda s: APP_NAME not in s.apps, timeout=1000)
