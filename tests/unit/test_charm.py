@@ -169,6 +169,10 @@ class TestHolisticHandler:
             remote_app_data={
                 "secret_key_secret_id": cluster_secret.id,
                 "server_version": "2026.2.0",
+                "db_host": "test-host",
+                "db_port": "5432",
+                "db_user": "test-user",
+                "db_name": "authentik",
             },
         )
         state = create_state(
@@ -310,6 +314,10 @@ class TestCollectStatusEvent:
             remote_app_data={
                 "secret_key_secret_id": cluster_secret.id,
                 "server_version": "2026.2.0",
+                "db_host": "test-host",
+                "db_port": "5432",
+                "db_user": "test-user",
+                "db_name": "authentik",
             },
         )
         state = create_state(

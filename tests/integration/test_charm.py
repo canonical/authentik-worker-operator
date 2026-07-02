@@ -57,7 +57,7 @@ def test_build_and_deploy(juju: jubilant.Juju, charm: Path) -> None:
     juju.wait(
         ready=all_active(APP_NAME, DB_APP, SERVER_APP),
         error=any_error(APP_NAME, DB_APP, SERVER_APP),
-        timeout=15 * 60,
+        timeout=10 * 60,
     )
 
 
@@ -131,4 +131,4 @@ def test_scale_down(juju: jubilant.Juju) -> None:
 def test_remove_application(juju: jubilant.Juju) -> None:
     """Test removing the application."""
     juju.remove_application(APP_NAME, destroy_storage=True)
-    juju.wait(lambda s: APP_NAME not in s.apps, timeout=1000)
+    juju.wait(lambda s: APP_NAME not in s.apps, timeout=5 * 60)

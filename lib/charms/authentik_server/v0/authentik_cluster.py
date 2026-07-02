@@ -74,7 +74,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 LIBID = "810ec184ec9e4c61aa18b3eef8e5e241"
 LIBAPI = 0
-LIBPATCH = 1
+LIBPATCH = 2
 
 PYDEPS = ["pydantic"]
 
@@ -88,10 +88,10 @@ class ProviderData(BaseModel):
     """Data published by the authentik-server into the cluster relation databag."""
 
     secret_key_secret_id: str
-    db_host: Optional[str] = None
-    db_port: Optional[str] = None
-    db_user: Optional[str] = None
-    db_name: Optional[str] = None
+    db_host: str
+    db_port: str
+    db_user: str
+    db_name: str
     server_version: str = ""
 
     secret_key: Optional[str] = Field(default=None, exclude=True)
@@ -164,24 +164,11 @@ class AuthentikClusterProvider(Object):
         else:
             self._delete_secret()
 
-    def _create_or_update_secret(
-        self,
-        secret_key: str,
-        db_host: str,
-        db_port: str,
-        db_user: str,
-        db_password: str,
-        db_name: str,
-    ) -> Secret:
-        """Create or update the app-owned Juju secret for the cluster secret key and database config."""
-        content = {
-            "secret-key": secret_key,
-            "db-host": db_host,
-            "db-port": db_port,
-            "db-user": db_user,
-            "db-password": db_password,
-            "db-name": db_name,
-        }
+    def _create_or_update_secret(self, secret_key: str, db_password: Optional[str] = None) -> Secret:
+        """Create or update the app-owned Juju secret for the cluster secret key."""
+        content = {"secret-key": secret_key}
+        if db_password:
+            content["db-password"] = db_password
         try:
             secret = self._charm.model.get_secret(label="authentik-secret-key")
             current_content = secret.get_content()
@@ -230,21 +217,18 @@ class AuthentikClusterProvider(Object):
         if not self._charm.unit.is_leader():
             return
 
-        secret = self._create_or_update_secret(
-            secret_key,
-            db_host,
-            db_port,
-            db_user,
-            db_password,
-            db_name,
+        secret = self._create_or_update_secret(secret_key, db_password)
+        data = ProviderData(
+            secret_key_secret_id=secret.id or secret.get_info().id,
+            server_version=server_version,
+            db_host=db_host,
+            db_port=db_port,
+            db_user=db_user,
+            db_name=db_name,
         )
-        data = {
-            "secret_key_secret_id": secret.id or secret.get_info().id,
-            "server_version": server_version,
-        }
         for relation in self._charm.model.relations.get(self._relation_name, []):
             secret.grant(relation)
-            relation.data[self._charm.app].update(data)
+            relation.data[self._charm.app].update(data.model_dump(mode="json", exclude_none=True))
 
     def is_ready(self) -> bool:
         """True if the secret key has been created and published to all relations."""
@@ -297,8 +281,7 @@ class AuthentikClusterRequirer(Object):
         if not relation or not relation.app:
             return None
         raw = dict(relation.data[relation.app])
-        secret_id = raw.get("secret_key_secret_id")
-        if not secret_id:
+        if not (secret_id := raw.get("secret_key_secret_id")):
             return None
 
         secret = self._get_secret(secret_id)
@@ -311,11 +294,7 @@ class AuthentikClusterRequirer(Object):
             logger.warning("Failed to retrieve content for cluster secret: %s", e)
             return None
 
-        raw["db_host"] = content.get("db-host")
-        raw["db_port"] = content.get("db-port")
-        raw["db_user"] = content.get("db-user")
         raw["db_password"] = content.get("db-password")
-        raw["db_name"] = content.get("db-name")
         raw["secret_key"] = content.get("secret-key")
 
         try:
