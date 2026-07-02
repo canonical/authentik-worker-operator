@@ -38,7 +38,7 @@ def http_client() -> Generator[requests.Session, None, None]:
 
 def integrate_dependencies(juju: jubilant.Juju) -> None:
     """Integrate the charm with all required dependencies."""
-    juju.integrate(DB_APP, APP_NAME)
+    juju.integrate(DB_APP, SERVER_APP)
     juju.integrate(f"{SERVER_APP}:{CLUSTER_RELATION}", APP_NAME)
 
 

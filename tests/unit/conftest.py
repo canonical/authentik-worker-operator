@@ -119,11 +119,7 @@ def cluster_secret() -> testing.Secret:
     return testing.Secret(
         {
             "secret-key": "test-secret-key",
-            "db-host": "test-host",
-            "db-port": "5432",
-            "db-user": "test-user",
             "db-password": "test-pass",
-            "db-name": "authentik",
         },
         id="secret:abc123",
     )
@@ -139,6 +135,10 @@ def cluster_relation_ready(cluster_secret: testing.Secret) -> testing.Relation:
         remote_app_data={
             "secret_key_secret_id": cluster_secret.id,
             "server_version": "2026.2.2",
+            "db_host": "test-host",
+            "db_port": "5432",
+            "db_user": "test-user",
+            "db_name": "authentik",
         },
     )
 
