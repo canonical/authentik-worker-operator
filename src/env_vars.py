@@ -10,6 +10,14 @@ EnvVars: TypeAlias = Mapping[str, Union[str, bool]]
 DEFAULT_WORKER_ENV: dict[str, str | bool] = {
     "AUTHENTIK_ERROR_REPORTING__ENABLED": "false",
     "AUTHENTIK_LOG_LEVEL": "info",
+    # Upstream container and Python execution environment variables
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "VIRTUAL_ENV": "/ak-root/.venv",
+    "VENV_PATH": "/ak-root/.venv",
+    "PYTHONPATH": "/",
+    "AK_RUNNING_IN_CONTAINER": "true",
+    "GOFIPS": "1",
     # The ak lifecycle script calls `python` which only exists in the venv.
     # Juju's charm layer uses override:replace, discarding the rock's PATH.
     "PATH": "/lifecycle:/ak-root/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
