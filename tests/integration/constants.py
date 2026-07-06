@@ -10,7 +10,7 @@ APP_NAME = METADATA["name"]
 APP_IMAGE = METADATA["resources"]["oci-image"]["upstream-source"]
 
 DB_APP = "postgresql-k8s"
-DB_CHANNEL = "14/stable"
+DB_CHANNEL = "16/stable"
 
 SERVER_APP = "authentik-server"
 SERVER_CHANNEL = "latest/edge"
