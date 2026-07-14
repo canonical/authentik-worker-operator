@@ -9,7 +9,7 @@ from typing import Generator
 import jubilant
 import pytest
 import requests
-from integration.constants import APP_NAME, DB_APP, SERVER_APP
+from integration.constants import APP_NAME, CA_APP, DB_APP, SERVER_APP, TRAEFIK_APP
 from integration.utils import get_unit_address
 
 from src.constants import CLUSTER_RELATION
@@ -39,7 +39,9 @@ def http_client() -> Generator[requests.Session, None, None]:
 def integrate_dependencies(juju: jubilant.Juju) -> None:
     """Integrate the charm with all required dependencies."""
     juju.integrate(DB_APP, SERVER_APP)
+    juju.integrate(f"{TRAEFIK_APP}:certificates", f"{CA_APP}:certificates")
     juju.integrate(f"{SERVER_APP}:{CLUSTER_RELATION}", APP_NAME)
+    juju.integrate(f"{SERVER_APP}:traefik-route", TRAEFIK_APP)
 
 
 @pytest.fixture
