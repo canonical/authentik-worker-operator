@@ -12,10 +12,14 @@ from integration.conftest import integrate_dependencies
 from integration.constants import (
     APP_IMAGE,
     APP_NAME,
+    CA_APP,
+    CA_CHANNEL,
     DB_APP,
     DB_CHANNEL,
     SERVER_APP,
     SERVER_CHANNEL,
+    TRAEFIK_APP,
+    TRAEFIK_CHANNEL,
 )
 from integration.utils import (
     StatusPredicate,
@@ -38,6 +42,17 @@ def test_build_and_deploy(juju: jubilant.Juju, charm: Path) -> None:
     juju.deploy(
         DB_APP,
         channel=DB_CHANNEL,
+        trust=True,
+    )
+    juju.deploy(
+        TRAEFIK_APP,
+        channel=TRAEFIK_CHANNEL,
+        config={"external_hostname": "authentik.example.com"},
+        trust=True,
+    )
+    juju.deploy(
+        CA_APP,
+        channel=CA_CHANNEL,
         trust=True,
     )
     juju.deploy(

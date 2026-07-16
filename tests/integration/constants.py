@@ -12,5 +12,11 @@ APP_IMAGE = METADATA["resources"]["oci-image"]["upstream-source"]
 DB_APP = "postgresql-k8s"
 DB_CHANNEL = "16/stable"
 
+TRAEFIK_APP = "traefik-k8s"
+TRAEFIK_CHANNEL = "latest/edge"
+
 SERVER_APP = "authentik-server"
 SERVER_CHANNEL = "latest/edge"
+
+CA_APP = "self-signed-certificates"
+CA_CHANNEL = "latest/stable"
