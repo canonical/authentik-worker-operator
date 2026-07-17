@@ -21,6 +21,10 @@ class TestCharmConfig:
             "http_proxy": "http://proxy:6666",
             "https_proxy": "http://proxy:6666",
             "no_proxy": "localhost",
+            "postgresql_disable_server_side_cursors": True,
+            "postgresql_conn_health_checks": True,
+            "postgresql_conn_max_age": 10,
+            "consumer_listen_timeout": 5,
         }
 
     @pytest.fixture
@@ -42,6 +46,10 @@ class TestCharmConfig:
         assert env["HTTP_PROXY"] == "http://proxy:6666"
         assert env["HTTPS_PROXY"] == "http://proxy:6666"
         assert env["NO_PROXY"] == "localhost"
+        assert env["AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS"] == "true"
+        assert env["AUTHENTIK_POSTGRESQL__CONN_HEALTH_CHECKS"] == "true"
+        assert env["AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"] == "10"
+        assert env["AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT"] == "5"
 
     def test_to_env_vars_defaults(self, minimal_config: dict) -> None:
         config = CharmConfig(minimal_config)
@@ -56,3 +64,7 @@ class TestCharmConfig:
         assert "HTTP_PROXY" not in env
         assert "HTTPS_PROXY" not in env
         assert "NO_PROXY" not in env
+        assert env["AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS"] == "false"
+        assert env["AUTHENTIK_POSTGRESQL__CONN_HEALTH_CHECKS"] == "false"
+        assert env["AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"] == "0"
+        assert env["AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT"] == "30"
