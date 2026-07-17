@@ -27,6 +27,10 @@ DEFAULT_WORKER_ENV: dict[str, str | bool] = {
     "AUTHENTIK_POSTGRESQL__USER": "",
     "AUTHENTIK_POSTGRESQL__PASSWORD": "",
     "AUTHENTIK_POSTGRESQL__NAME": "",
+    "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS": "false",
+    "AUTHENTIK_POSTGRESQL__CONN_HEALTH_CHECKS": "false",
+    "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE": "0",
+    "AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT": "30",
     # Cluster secret — populated by AuthentikClusterIntegration
     "AUTHENTIK_SECRET_KEY": "",
     # Update check — always disabled in charm-managed deployments
