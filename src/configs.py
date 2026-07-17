@@ -37,9 +37,7 @@ class CharmConfig:
             "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE": str(
                 self._config.get("postgresql_conn_max_age", 0)
             ),
-            "AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT": str(
-                self._config.get("consumer_listen_timeout", 30)
-            ),
+            "AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT": f"seconds={self._config.get('consumer_listen_timeout', 30)}",
         }
 
         if http_proxy := self._config.get("http_proxy"):

@@ -49,7 +49,7 @@ class TestCharmConfig:
         assert env["AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS"] == "true"
         assert env["AUTHENTIK_POSTGRESQL__CONN_HEALTH_CHECKS"] == "true"
         assert env["AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"] == "10"
-        assert env["AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT"] == "5"
+        assert env["AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT"] == "seconds=5"
 
     def test_to_env_vars_defaults(self, minimal_config: dict) -> None:
         config = CharmConfig(minimal_config)
@@ -67,4 +67,4 @@ class TestCharmConfig:
         assert env["AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS"] == "false"
         assert env["AUTHENTIK_POSTGRESQL__CONN_HEALTH_CHECKS"] == "false"
         assert env["AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"] == "0"
-        assert env["AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT"] == "30"
+        assert env["AUTHENTIK_WORKER__CONSUMER_LISTEN_TIMEOUT"] == "seconds=30"
