@@ -114,22 +114,22 @@ class TestWorkloadServiceIsRunning:
         return WorkloadService(_unit_with_container(container))
 
     def test_running_when_up_and_has_successes(self) -> None:
-        """is_running is True only when the check is UP and has recorded successes."""
+        """is_running is True when the check is UP and has recorded successes."""
         service = self._service_with_check(CheckStatus.UP, 3)
 
         assert service.is_running() is True
 
-    def test_not_running_when_up_but_no_successes(self) -> None:
-        """is_running is False when the check is UP but has zero successes."""
+    def test_running_when_up_but_no_successes(self) -> None:
+        """is_running is True when the check is UP even with zero successes on first start."""
         service = self._service_with_check(CheckStatus.UP, 0)
 
-        assert service.is_running() is False
+        assert service.is_running() is True
 
-    def test_not_running_when_successes_none(self) -> None:
-        """is_running is False when the check reports no successes field."""
+    def test_running_when_successes_none(self) -> None:
+        """is_running is True when the check is UP and reports no successes field."""
         service = self._service_with_check(CheckStatus.UP, None)
 
-        assert service.is_running() is False
+        assert service.is_running() is True
 
     def test_not_running_when_check_down(self) -> None:
         """is_running is False when the ready check is DOWN even with successes."""

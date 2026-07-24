@@ -146,7 +146,7 @@ class WorkloadService:
         self._unit.open_port(protocol="tcp", port=HTTP_PORT)
 
     def is_running(self) -> bool:
-        """Return True when service is running and the ready check is up."""
+        """Return True when the service is running and the ready check is up."""
         try:
             service = self._container.get_service(WORKLOAD_SERVICE)
         except (ModelError, PebbleConnectionError) as e:
@@ -157,9 +157,7 @@ class WorkloadService:
             return False
 
         c = self._container.get_checks().get(PEBBLE_READY_CHECK_NAME)
-        if not c:
-            return False
-        return c.status == CheckStatus.UP and (c.successes or 0) > 0
+        return c is not None and c.status == CheckStatus.UP
 
     def is_failing(self) -> bool:
         """Return True when service is failing, crashlooping, or the ready check is down."""
