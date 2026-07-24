@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/canonical/authentik-worker-operator/compare/v1.0.0...v1.0.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* surface the worker version-gate status and cache the workload version ([baa390c](https://github.com/canonical/authentik-worker-operator/commit/baa390c8e6380ea395d3b73234e9a66d36b98bac))
+* unblock worker startup, surface pebble failures, cache per event ([#36](https://github.com/canonical/authentik-worker-operator/issues/36)) ([f76e6ec](https://github.com/canonical/authentik-worker-operator/commit/f76e6ec8388c0bf64e17a23f95fbf94aff943ed5))
+
 ## 1.0.0 (2026-07-17)
 
 
