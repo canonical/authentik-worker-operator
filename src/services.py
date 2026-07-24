@@ -5,7 +5,9 @@
 
 import copy
 import logging
+from functools import cached_property
 
+import ops
 from ops import ModelError, Unit
 from ops.pebble import CheckStatus
 from ops.pebble import ConnectionError as PebbleConnectionError
@@ -76,13 +78,13 @@ class PebbleService:
         Raises:
             PebbleError: If the service fails to start.
         """
-        self._container.add_layer(WORKLOAD_SERVICE, layer, combine=True)
         try:
+            self._container.add_layer(WORKLOAD_SERVICE, layer, combine=True)
             if not self._container.get_service(WORKLOAD_SERVICE).is_running():
                 self._container.start(WORKLOAD_SERVICE)
             else:
                 self._container.replan()
-        except Exception as e:
+        except ops.pebble.Error as e:
             raise PebbleError(f"Pebble failed to replan the workload service. Error: {e}")
 
     def render_pebble_layer(self, *env_var_sources: EnvVarConvertible) -> Layer:
@@ -112,9 +114,13 @@ class WorkloadService:
         self._unit = unit
         self._container = unit.get_container(WORKLOAD_CONTAINER)
 
-    @property
+    @cached_property
     def version(self) -> str:
-        """Workload version reported by the binary, or empty on failure."""
+        """Workload version reported by the binary, or empty on failure.
+
+        Fetched once per unit lifetime (a single hook), since it is read multiple
+        times per event (noop check, collect-status, set_version).
+        """
         try:
             process = self._container.exec(
                 [
@@ -153,7 +159,7 @@ class WorkloadService:
         c = self._container.get_checks().get(PEBBLE_READY_CHECK_NAME)
         if not c:
             return False
-        return c.status == CheckStatus.UP
+        return c.status == CheckStatus.UP and (c.successes or 0) > 0
 
     def is_failing(self) -> bool:
         """Return True when service is failing, crashlooping, or the ready check is down."""

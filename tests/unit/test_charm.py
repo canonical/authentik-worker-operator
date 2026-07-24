@@ -160,7 +160,7 @@ class TestHolisticHandler:
         cluster_secret: testing.Secret,
         mocked_workload_service_version: MagicMock,
     ) -> None:
-        """Reconciliation exits early when server and worker versions differ."""
+        """Reconciliation is gated when the worker and server versions differ."""
         mocked_workload_service_version.return_value = "2026.1.0"
         cluster_rel_with_version = testing.Relation(
             CLUSTER_RELATION,
@@ -192,8 +192,10 @@ class TestCollectStatusEvent:
         self,
         context: testing.Context,
         all_satisfied_conditions: None,
+        cluster_relation_ready: testing.Relation,
+        cluster_secret: testing.Secret,
     ) -> None:
-        state = create_state()
+        state = create_state(relations=[cluster_relation_ready], secrets=[cluster_secret])
 
         state_out = context.run(context.on.collect_unit_status(), state)
 
@@ -289,14 +291,43 @@ class TestCollectStatusEvent:
         context: testing.Context,
         all_satisfied_conditions: None,
         mocked_is_running: MagicMock,
+        cluster_relation_ready: testing.Relation,
+        cluster_secret: testing.Secret,
     ) -> None:
         """WaitingStatus when service is not yet running."""
         mocked_is_running.return_value = False
-        state = create_state()
+        state = create_state(relations=[cluster_relation_ready], secrets=[cluster_secret])
 
         state_out = context.run(context.on.collect_unit_status(), state)
 
         assert state_out.unit_status == testing.WaitingStatus("waiting for service to start")
+
+    def test_when_server_version_unknown_adds_waiting_status(
+        self,
+        context: testing.Context,
+        all_satisfied_conditions: None,
+        cluster_secret: testing.Secret,
+    ) -> None:
+        """WaitingStatus when the server has not yet published its version."""
+        cluster_rel_no_version = testing.Relation(
+            CLUSTER_RELATION,
+            interface="authentik_cluster",
+            remote_app_name="authentik-server",
+            remote_app_data={
+                "secret_key_secret_id": cluster_secret.id,
+                "db_host": "test-host",
+                "db_port": "5432",
+                "db_user": "test-user",
+                "db_name": "authentik",
+            },
+        )
+        state = create_state(relations=[cluster_rel_no_version], secrets=[cluster_secret])
+
+        state_out = context.run(context.on.collect_unit_status(), state)
+
+        assert state_out.unit_status == testing.WaitingStatus(
+            "waiting for server version to be published"
+        )
 
     def test_when_version_mismatch_adds_blocked_status(
         self,
