@@ -126,6 +126,7 @@ class AuthentikWorkerCharm(ops.CharmBase):
     def _holistic_handler(self, event: ops.EventBase) -> None:
         """Idempotent reconciliation. Called on every event."""
         if not all(condition(self) for condition in NOOP_CONDITIONS):
+            self._stop_on_version_mismatch()
             return
 
         layer = self._pebble.render_pebble_layer(
@@ -137,6 +138,29 @@ class AuthentikWorkerCharm(ops.CharmBase):
             self._pebble.plan(layer)
         except PebbleError as e:
             logger.error("Failed to plan pebble layer: %s", e)
+
+    def _stop_on_version_mismatch(self) -> None:
+        """Stop the workload when a definite server/worker version mismatch exists.
+
+        A definite mismatch means both versions are known and differ; Authentik
+        requires server/worker version parity, so a mismatched worker must not
+        keep processing tasks. An unknown or not-yet-published version leaves the
+        service untouched (it stays Waiting rather than Blocked).
+        """
+        server_version = self.cluster.get_server_version()
+        worker_version = self._workload_service.version
+        if not (server_version and worker_version and server_version != worker_version):
+            return
+        if not self._container.can_connect():
+            return
+        try:
+            self._container.get_service(WORKLOAD_SERVICE)
+        except ops.ModelError:
+            return
+        try:
+            self._container.stop(WORKLOAD_SERVICE)
+        except ops.pebble.Error:
+            logger.warning("Failed to stop workload after version mismatch")
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
         """Build resource requirements from charm config."""
@@ -167,9 +191,10 @@ class AuthentikWorkerCharm(ops.CharmBase):
             logger.warning("Workload check failed: %s", event.info.name)
 
     def _on_pebble_check_recovered(self, event: ops.PebbleCheckRecoveredEvent) -> None:
-        """Log when the worker ready check recovers."""
+        """Re-drive reconciliation and status when the worker ready check recovers."""
         if event.info.name == PEBBLE_READY_CHECK_NAME:
             logger.info("Workload check recovered: %s", event.info.name)
+            self._on_holistic_handler(event)
 
     def _on_cluster_integration_broken(self, event: ops.RelationBrokenEvent) -> None:
         """Stop service when authentik-cluster integration is removed."""
