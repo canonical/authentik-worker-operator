@@ -7,10 +7,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from ops import StatusBase, testing
+from ops.pebble import CheckLevel, CheckStatus, Layer, ServiceStatus
 from pytest_mock import MockerFixture
 from unit.conftest import create_state
 
-from constants import CLUSTER_RELATION, WORKLOAD_CONTAINER, WORKLOAD_SERVICE
+from constants import (
+    CLUSTER_RELATION,
+    PEBBLE_READY_CHECK_NAME,
+    WORKLOAD_CONTAINER,
+    WORKLOAD_SERVICE,
+)
+from services import PEBBLE_LAYER_DICT
 
 
 class TestPebbleReadyEvent:
@@ -388,3 +395,172 @@ class TestClusterIntegrationBroken:
         state = create_state(relations=[cluster_relation], can_connect=False)
 
         context.run(context.on.relation_broken(cluster_relation), state)
+
+
+def _mismatch_relation(cluster_secret: testing.Secret) -> testing.Relation:
+    """Return a cluster relation whose server version differs from the worker's."""
+    return testing.Relation(
+        CLUSTER_RELATION,
+        interface="authentik_cluster",
+        remote_app_name="authentik-server",
+        remote_app_data={
+            "secret_key_secret_id": cluster_secret.id,
+            "server_version": "2026.2.0",
+            "db_host": "test-host",
+            "db_port": "5432",
+            "db_user": "test-user",
+            "db_name": "authentik",
+        },
+    )
+
+
+def _running_workload_container() -> testing.Container:
+    """Return a workload container whose service exists and is active."""
+    layer = Layer({"services": {WORKLOAD_SERVICE: {"override": "replace", "command": "test"}}})
+    return testing.Container(
+        WORKLOAD_CONTAINER,
+        can_connect=True,
+        layers={"authentik": layer},
+        service_statuses={WORKLOAD_SERVICE: ServiceStatus.ACTIVE},
+    )
+
+
+class TestPebbleCheckRecovered:
+    """Tests for _on_pebble_check_recovered re-driving reconciliation."""
+
+    def test_recovered_triggers_status_refresh(
+        self,
+        context: testing.Context,
+        mocked_holistic_handler: MagicMock,
+    ) -> None:
+        """A recovered ready check re-drives the holistic handler to refresh status."""
+        check = testing.CheckInfo(
+            PEBBLE_READY_CHECK_NAME,
+            level=CheckLevel.READY,
+            threshold=10,
+            status=CheckStatus.UP,
+        )
+        container = testing.Container(
+            WORKLOAD_CONTAINER,
+            can_connect=True,
+            layers={"authentik": Layer(PEBBLE_LAYER_DICT)},
+            check_infos={check},
+        )
+        state = create_state(containers=[container])
+
+        context.run(context.on.pebble_check_recovered(container, check), state)
+
+        mocked_holistic_handler.assert_called_once()
+
+    def test_unrelated_check_does_not_refresh(
+        self,
+        context: testing.Context,
+        mocked_holistic_handler: MagicMock,
+    ) -> None:
+        """A recovered check other than the ready check does not re-drive reconciliation."""
+        check = testing.CheckInfo(
+            "alive", level=CheckLevel.ALIVE, threshold=10, status=CheckStatus.UP
+        )
+        container = testing.Container(
+            WORKLOAD_CONTAINER,
+            can_connect=True,
+            layers={"authentik": Layer(PEBBLE_LAYER_DICT)},
+            check_infos={check},
+        )
+        state = create_state(containers=[container])
+
+        context.run(context.on.pebble_check_recovered(container, check), state)
+
+        mocked_holistic_handler.assert_not_called()
+
+
+class TestVersionMismatchStopsWorkload:
+    """Tests for stopping the workload on a definite server/worker version mismatch."""
+
+    def test_known_mismatch_stops_service(
+        self,
+        context: testing.Context,
+        cluster_secret: testing.Secret,
+        mocked_workload_service_version: MagicMock,
+        mocker: MockerFixture,
+    ) -> None:
+        """A definite version mismatch stops the running workload service."""
+        mocked_workload_service_version.return_value = "2026.1.0"
+        mock_stop = mocker.patch("ops.model.Container.stop")
+        state = create_state(
+            relations=[_mismatch_relation(cluster_secret)],
+            secrets=[cluster_secret],
+            containers=[_running_workload_container()],
+        )
+
+        context.run(context.on.config_changed(), state)
+
+        mock_stop.assert_called_once_with(WORKLOAD_SERVICE)
+
+    def test_known_mismatch_reports_blocked(
+        self,
+        context: testing.Context,
+        all_satisfied_conditions: None,
+        cluster_secret: testing.Secret,
+        mocked_workload_service_version: MagicMock,
+    ) -> None:
+        """A definite version mismatch surfaces a BlockedStatus."""
+        mocked_workload_service_version.return_value = "2026.1.0"
+        state = create_state(
+            relations=[_mismatch_relation(cluster_secret)],
+            secrets=[cluster_secret],
+        )
+
+        state_out = context.run(context.on.collect_unit_status(), state)
+
+        assert isinstance(state_out.unit_status, testing.BlockedStatus)
+        assert "version mismatch" in state_out.unit_status.message
+
+    def test_unknown_version_does_not_stop_service(
+        self,
+        context: testing.Context,
+        cluster_relation_ready: testing.Relation,
+        cluster_secret: testing.Secret,
+        mocker: MockerFixture,
+    ) -> None:
+        """An unknown/not-yet-published server version does not stop the service."""
+        mock_stop = mocker.patch("ops.model.Container.stop")
+        state = create_state(
+            relations=[cluster_relation_ready],
+            secrets=[cluster_secret],
+            containers=[_running_workload_container()],
+        )
+
+        context.run(context.on.config_changed(), state)
+
+        mock_stop.assert_not_called()
+
+    def test_matched_version_runs_normally(
+        self,
+        context: testing.Context,
+        cluster_secret: testing.Secret,
+        mocked_workload_service_version: MagicMock,
+        mocker: MockerFixture,
+    ) -> None:
+        """Matched versions plan the layer and never stop the service."""
+        mocked_workload_service_version.return_value = "2026.2.0"
+        matched_relation = testing.Relation(
+            CLUSTER_RELATION,
+            interface="authentik_cluster",
+            remote_app_name="authentik-server",
+            remote_app_data={
+                "secret_key_secret_id": cluster_secret.id,
+                "server_version": "2026.2.0",
+                "db_host": "test-host",
+                "db_port": "5432",
+                "db_user": "test-user",
+                "db_name": "authentik",
+            },
+        )
+        mock_stop = mocker.patch("ops.model.Container.stop")
+        state = create_state(relations=[matched_relation], secrets=[cluster_secret])
+
+        state_out = context.run(context.on.config_changed(), state)
+
+        assert state_out.get_container(WORKLOAD_CONTAINER).plan.services
+        mock_stop.assert_not_called()
