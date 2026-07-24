@@ -209,6 +209,8 @@ class AuthentikWorkerCharm(ops.CharmBase):
             return ops.BlockedStatus(
                 f"version mismatch: server={server_version}, worker={worker_version}"
             )
+        if not server_version:
+            return ops.WaitingStatus("waiting for server version to be published")
 
         return ops.ActiveStatus()
 
