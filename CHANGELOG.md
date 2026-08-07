@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/canonical/authentik-worker-operator/compare/v1.0.1...v1.0.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **deps:** update dependency lightkube-models to ~=1.36.3.8 ([e2c2348](https://github.com/canonical/authentik-worker-operator/commit/e2c234880b687115921750ab1e292c916ba28817))
+* **deps:** update dependency lightkube-models to ~=1.36.3.8 ([#42](https://github.com/canonical/authentik-worker-operator/issues/42)) ([9560f30](https://github.com/canonical/authentik-worker-operator/commit/9560f301b3c824e8d73088bef772ce411f242985))
+
 ## [1.0.1](https://github.com/canonical/authentik-worker-operator/compare/v1.0.0...v1.0.1) (2026-07-24)
 
 
