@@ -40,6 +40,7 @@ PEBBLE_LAYER_DICT: LayerDict = {
         "alive": {
             "override": "replace",
             "level": "alive",
+            "startup": "enabled",
             "threshold": 10,
             "http": {
                 "url": f"http://localhost:{HTTP_PORT}/-/health/live/",
@@ -48,6 +49,7 @@ PEBBLE_LAYER_DICT: LayerDict = {
         PEBBLE_READY_CHECK_NAME: {
             "override": "replace",
             "level": "ready",
+            "startup": "enabled",
             "threshold": 10,
             "http": {
                 "url": f"http://localhost:{HTTP_PORT}/-/health/ready/",
