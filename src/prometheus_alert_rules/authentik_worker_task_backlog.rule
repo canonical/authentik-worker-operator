@@ -1,0 +1,13 @@
+groups:
+- name: AuthentikWorkerTaskBacklog
+  rules:
+  - alert: AuthentikWorkerTaskBacklog
+    expr: >-
+      sum by (juju_model, juju_application) (
+        max by (juju_model, juju_application, queue_name, actor_name) (authentik_tasks_queued)
+      ) > 100
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "More than 100 authentik background tasks have been queued for 15 minutes in {{ $labels.juju_application }} (model {{ $labels.juju_model }}); the worker is not draining its queue"

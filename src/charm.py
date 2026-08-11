@@ -8,6 +8,7 @@ import logging
 
 import ops
 from charms.authentik_server.v0.authentik_cluster import AuthentikClusterRequirer
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
@@ -21,12 +22,13 @@ from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 from configs import CharmConfig
 from constants import (
     CLUSTER_RELATION,
+    GRAFANA_RELATION,
     LOGGING_RELATION,
+    METRICS_PORT,
     METRICS_RELATION,
     PEBBLE_READY_CHECK_NAME,
     TRACING_RELATION,
     WORKLOAD_CONTAINER,
-    WORKLOAD_PORT,
     WORKLOAD_SERVICE,
 )
 from exceptions import PebbleError
@@ -60,10 +62,11 @@ class AuthentikWorkerCharm(ops.CharmBase):
             jobs=[
                 {
                     "job_name": "authentik_worker_metrics",
-                    "static_configs": [{"targets": [f"*:{WORKLOAD_PORT}"]}],
+                    "static_configs": [{"targets": [f"*:{METRICS_PORT}"]}],
                 }
             ],
         )
+        self.grafana_dashboard = GrafanaDashboardProvider(self, relation_name=GRAFANA_RELATION)
         self.resources_patch = KubernetesComputeResourcesPatch(
             self,
             WORKLOAD_CONTAINER,

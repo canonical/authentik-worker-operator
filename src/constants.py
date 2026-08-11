@@ -9,9 +9,11 @@ COMMAND = "/lifecycle/ak worker"
 PEBBLE_READY_CHECK_NAME = "ready"
 WORKLOAD_PORT: int = 9000
 HTTP_PORT: int = WORKLOAD_PORT
+METRICS_PORT: int = 9300
 
 
 CLUSTER_RELATION = "authentik-cluster"
 LOGGING_RELATION = "logging"
 TRACING_RELATION = "tracing"
 METRICS_RELATION = "metrics-endpoint"
+GRAFANA_RELATION = "grafana-dashboard"
