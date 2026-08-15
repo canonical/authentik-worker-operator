@@ -84,6 +84,89 @@ class TestAuthentikClusterIntegration:
         assert env["AUTHENTIK_POSTGRESQL__PASSWORD"] == "test-pass"
         assert env["AUTHENTIK_POSTGRESQL__NAME"] == "authentik"
 
+    def test_to_env_vars_no_replicas_when_key_absent(self) -> None:
+        """No replica env vars are emitted when the library omits the db-read-replicas key."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "test-host",
+            "db-port": "5432",
+            "db-user": "test-user",
+            "db-password": "test-pass",
+            "db-name": "authentik",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+        env = integration.to_env_vars()
+        assert not [key for key in env if "READ_REPLICAS" in key]
+
+    def test_to_env_vars_no_replicas_when_value_empty(self) -> None:
+        """No replica env vars are emitted when db-read-replicas is present but empty."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "test-host",
+            "db-port": "5432",
+            "db-user": "test-user",
+            "db-password": "test-pass",
+            "db-name": "authentik",
+            "db-read-replicas": "",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+        env = integration.to_env_vars()
+        assert not [key for key in env if "READ_REPLICAS" in key]
+
+    def test_to_env_vars_indexes_multiple_replicas(self) -> None:
+        """Each replica endpoint becomes a contiguously indexed HOST/PORT env var pair."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "test-host",
+            "db-port": "5432",
+            "db-user": "test-user",
+            "db-password": "test-pass",
+            "db-name": "authentik",
+            "db-read-replicas": "replica-0:5432, replica-1:5433",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+        env = integration.to_env_vars()
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__0__HOST"] == "replica-0"
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__0__PORT"] == "5432"
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__1__HOST"] == "replica-1"
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__1__PORT"] == "5433"
+        assert "AUTHENTIK_POSTGRESQL__READ_REPLICAS__2__HOST" not in env
+
+    def test_to_env_vars_replicas_split_on_last_colon(self) -> None:
+        """An IPv6 literal endpoint is split on the last colon, keeping the address intact."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "test-host",
+            "db-port": "5432",
+            "db-name": "authentik",
+            "db-read-replicas": "[fd42::1]:5432",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+        env = integration.to_env_vars()
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__0__HOST"] == "[fd42::1]"
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__0__PORT"] == "5432"
+
+    def test_to_env_vars_replicas_skip_blank_and_malformed_entries(self) -> None:
+        """Blank and portless entries are dropped and remaining replicas stay contiguous."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "test-host",
+            "db-port": "5432",
+            "db-name": "authentik",
+            "db-read-replicas": "replica-0:5432, , no-port ,replica-1:5433",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+        env = integration.to_env_vars()
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__0__HOST"] == "replica-0"
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__1__HOST"] == "replica-1"
+        assert env["AUTHENTIK_POSTGRESQL__READ_REPLICAS__1__PORT"] == "5433"
+        assert "AUTHENTIK_POSTGRESQL__READ_REPLICAS__2__HOST" not in env
+
     def test_to_env_vars_empty_when_not_ready(self) -> None:
         """AuthentikClusterIntegration returns empty dict when credentials are not available."""
         cluster = create_autospec(AuthentikClusterRequirer, instance=True)
@@ -129,3 +212,36 @@ class TestTracingData:
         requirer.is_ready.return_value = False
         tracing_data = TracingData.load(requirer)
         assert tracing_data.to_env_vars() == {}
+
+    def test_use_pgbouncer_inherited_from_databag(self) -> None:
+        """The pgbouncer declaration comes from the server, not local config."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "pgb",
+            "db-port": "6432",
+            "db-user": "u",
+            "db-password": "p",
+            "db-name": "authentik",
+            "db-use-pgbouncer": "true",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+
+        assert integration.to_env_vars()["AUTHENTIK_POSTGRESQL__USE_PGBOUNCER"] == "true"
+        assert integration.uses_pgbouncer() is True
+
+    def test_use_pgbouncer_defaults_false_when_key_absent(self) -> None:
+        """An older server that does not publish the key is treated as not pooled."""
+        cluster = create_autospec(AuthentikClusterRequirer, instance=True)
+        cluster.get_secret_key.return_value = "test-secret"
+        cluster.get_database_config.return_value = {
+            "db-host": "pg",
+            "db-port": "5432",
+            "db-user": "u",
+            "db-password": "p",
+            "db-name": "authentik",
+        }
+        integration = AuthentikClusterIntegration(cluster)
+
+        assert integration.to_env_vars()["AUTHENTIK_POSTGRESQL__USE_PGBOUNCER"] == "false"
+        assert integration.uses_pgbouncer() is False
