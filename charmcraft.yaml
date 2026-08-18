@@ -137,6 +137,11 @@ provides:
     optional: true
     description: |
       Provides application metrics to COS Prometheus instance
+  grafana-dashboard:
+    interface: grafana_dashboard
+    optional: true
+    description: |
+      Forwards the built-in grafana dashboard(s) for monitoring authentik-worker.
 
 containers:
   authentik:

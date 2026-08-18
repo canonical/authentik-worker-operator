@@ -69,7 +69,7 @@ decrypt cluster secrets.
 ### Observability
 
 Charmed Authentik Worker offers integration with the Canonical Observability
-Stack (COS) to forward logs, expose metrics, and export traces:
+Stack (COS) to forward logs, expose metrics, ship dashboards, and export traces:
 
 *   **Logging** (`logging`): Forward workload logs to Loki.
     ```shell
@@ -78,6 +78,10 @@ Stack (COS) to forward logs, expose metrics, and export traces:
 *   **Metrics** (`metrics-endpoint`): Expose Prometheus scrape endpoints.
     ```shell
     juju integrate prometheus-k8s authentik-worker:metrics-endpoint
+    ```
+*   **Dashboards** (`grafana-dashboard`): Import built-in Grafana monitoring dashboards.
+    ```shell
+    juju integrate grafana-k8s authentik-worker:grafana-dashboard
     ```
 *   **Tracing** (`tracing`): Send application trace data to Tempo.
     ```shell
