@@ -248,6 +248,21 @@ class AuthentikWorkerCharm(ops.CharmBase):
         if not can_connect:
             event.add_status(ops.WaitingStatus("waiting for pebble"))
 
+        # The pgbouncer declaration is inherited from the server over the cluster
+        # relation, but disabling server-side cursors is a local option, so the
+        # two can still be set inconsistently. Block rather than run queries that
+        # break when a transaction pooler moves them between backends.
+        if self._cluster_integration.uses_pgbouncer() and not self.config.get(
+            "postgresql_disable_server_side_cursors", False
+        ):
+            event.add_status(
+                ops.BlockedStatus(
+                    "the server declares postgresql_use_pgbouncer=true, which requires "
+                    "postgresql_disable_server_side_cursors=true on this charm: "
+                    "server-side cursors do not survive transaction pooling"
+                )
+            )
+
         event.add_status(self._check_db_status())
         event.add_status(self._check_cluster_status())
 
