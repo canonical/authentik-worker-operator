@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.0](https://github.com/canonical/authentik-worker-operator/compare/v1.0.1...v1.1.0) (2026-08-19)
+
+
+### Features
+
+* add working COS metrics, alert rules and dashboard ([21cc013](https://github.com/canonical/authentik-worker-operator/commit/21cc013032a42fffb091f05a50edd3f069ee9a68))
+* add working COS metrics, alert rules and dashboard ([#48](https://github.com/canonical/authentik-worker-operator/issues/48)) ([499f971](https://github.com/canonical/authentik-worker-operator/commit/499f9710844409794e00b24737bbd484234d65ad))
+
+
+### Bug Fixes
+
+* consume PostgreSQL read replicas and PgBouncer flag from the server ([246de2f](https://github.com/canonical/authentik-worker-operator/commit/246de2fcd6c826f51d585578b04bd496d4a25e59))
+* **deps:** update dependency lightkube to v1 ([3e9cfcf](https://github.com/canonical/authentik-worker-operator/commit/3e9cfcf702b57950921d5bfb014571391bb97122))
+* **deps:** update dependency lightkube to v1 ([#47](https://github.com/canonical/authentik-worker-operator/issues/47)) ([bf23f1f](https://github.com/canonical/authentik-worker-operator/commit/bf23f1f01bd6f67122d300b0293073312f3d7024))
+* **deps:** update dependency lightkube-models to ~=1.36.3.8 ([e2c2348](https://github.com/canonical/authentik-worker-operator/commit/e2c234880b687115921750ab1e292c916ba28817))
+* **deps:** update dependency lightkube-models to ~=1.36.3.8 ([#42](https://github.com/canonical/authentik-worker-operator/issues/42)) ([9560f30](https://github.com/canonical/authentik-worker-operator/commit/9560f301b3c824e8d73088bef772ce411f242985))
+* emit worker status promptly and stop on version mismatch ([c664a8a](https://github.com/canonical/authentik-worker-operator/commit/c664a8ae403408845609b927da3639643c3d1fa9))
+* emit worker status promptly and stop on version mismatch ([#40](https://github.com/canonical/authentik-worker-operator/issues/40)) ([5f3060c](https://github.com/canonical/authentik-worker-operator/commit/5f3060cc844df69840e982a048aeb94e012fc126))
+* **terraform:** align juju provider constraint with sibling modules ([e19d996](https://github.com/canonical/authentik-worker-operator/commit/e19d9962f55c086de58bc1ee1b4c6c3bde29b8aa))
+
 ## [1.0.1](https://github.com/canonical/authentik-worker-operator/compare/v1.0.0...v1.0.1) (2026-07-24)
 
 
