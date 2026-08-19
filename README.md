@@ -56,6 +56,14 @@ watch -c juju status --color
 Once the charms settle into an `active` and `idle` status, the Authentik setup
 is fully operational.
 
+### Documentation
+
+Comprehensive documentation for Charmed Authentik is available on the [Canonical Identity Platform Documentation](https://canonical-identity.readthedocs-hosted.com/):
+- **Tutorial**: [Getting Started with Charmed Authentik](https://canonical-identity.readthedocs-hosted.com/tutorial/authentik/getting-started/)
+- **How-To Guides**: [Common Administration Tasks and Tuning](https://canonical-identity.readthedocs-hosted.com/how-to/authentik/common-admin-tasks/)
+- **Reference**: [Charmed Authentik Worker Reference](https://canonical-identity.readthedocs-hosted.com/reference/authentik/charms/authentik-worker/)
+- **Explanation**: [Charmed Authentik Architecture & Security](https://canonical-identity.readthedocs-hosted.com/explanation/authentik/)
+
 ## Integrations
 
 ### Authentik Server (`authentik-cluster`)
