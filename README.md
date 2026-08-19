@@ -34,10 +34,10 @@ To deploy a fully functioning Authentik instance with the worker:
 juju deploy postgresql-k8s --channel 14/stable --trust
 
 # Deploy the Authentik Server operator
-juju deploy authentik-server --trust
+juju deploy authentik-server --channel latest/stable --trust
 
 # Deploy the Authentik Worker operator (this charm)
-juju deploy authentik-worker --channel latest/edge --trust
+juju deploy authentik-worker --channel latest/stable --trust
 
 # Integrate Authentik Server with the PostgreSQL database
 juju integrate postgresql-k8s authentik-server

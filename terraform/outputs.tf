@@ -18,6 +18,7 @@ output "requires" {
 output "provides" {
   description = "Map of provides endpoint names"
   value = {
-    metrics-endpoint = "metrics-endpoint"
+    grafana-dashboard = "grafana-dashboard"
+    metrics-endpoint  = "metrics-endpoint"
   }
 }
