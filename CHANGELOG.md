@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/canonical/authentik-worker-operator/compare/v1.1.0...v1.1.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **terraform:** declare a minimum Juju provider version ([#54](https://github.com/canonical/authentik-worker-operator/issues/54)) ([a0e6019](https://github.com/canonical/authentik-worker-operator/commit/a0e6019c44c67052e682d7214d91f228fd487705))
+* **terraform:** declare a minimum Juju provider version, not a pessimistic one ([bfca331](https://github.com/canonical/authentik-worker-operator/commit/bfca331e849c30d1561cbf29b6bfd37c236daa19))
+
 ## [1.1.0](https://github.com/canonical/authentik-worker-operator/compare/v1.0.1...v1.1.0) (2026-08-19)
 
 
