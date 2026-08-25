@@ -5,6 +5,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import ops
 import pytest
 from ops import StatusBase, testing
 from ops.pebble import CheckLevel, CheckStatus, Layer, ServiceStatus
@@ -190,6 +191,52 @@ class TestHolisticHandler:
         state_out = context.run(context.on.config_changed(), state)
 
         assert not state_out.get_container(WORKLOAD_CONTAINER).plan.services
+
+
+class TestClusterSecretReads:
+    """The cluster secret must be read once per hook, and refreshed only on demand."""
+
+    def test_collect_status_resolves_the_secret_once(
+        self,
+        context: testing.Context,
+        all_satisfied_conditions: None,
+        cluster_relation_ready: testing.Relation,
+        cluster_secret: testing.Secret,
+        mocker: MockerFixture,
+    ) -> None:
+        # _on_collect_status consults is_ready(), is_database_config_ready() and
+        # uses_pgbouncer() repeatedly. `Model.get_secret()` is the hook tool that costs
+        # a round trip and must run once; `Secret.get_content()` then serves from the
+        # object's own memo, and must never ask for a refresh.
+        state = create_state(relations=[cluster_relation_ready], secrets=[cluster_secret])
+        lookups = mocker.spy(ops.Model, "get_secret")
+        reads = mocker.spy(ops.Secret, "get_content")
+
+        context.run(context.on.collect_unit_status(), state)
+
+        assert lookups.call_count == 1
+        assert all(call.kwargs.get("refresh") is not True for call in reads.call_args_list)
+
+    def test_secret_changed_reconciles_with_the_new_revision(
+        self,
+        context: testing.Context,
+        all_satisfied_conditions: None,
+        mocked_workload_service_version: MagicMock,
+        cluster_secret: testing.Secret,
+        cluster_relation_ready: testing.Relation,
+    ) -> None:
+        rotated = testing.Secret(
+            id=cluster_secret.id,
+            tracked_content={"secret-key": "old-secret-key", "db-password": "test-pass"},
+            latest_content={"secret-key": "new-secret-key", "db-password": "test-pass"},
+        )
+        state = create_state(relations=[cluster_relation_ready], secrets=[rotated])
+
+        state_out = context.run(context.on.secret_changed(rotated), state)
+
+        services = state_out.get_container(WORKLOAD_CONTAINER).plan.to_dict()["services"]
+        env = services[WORKLOAD_SERVICE]["environment"]
+        assert env["AUTHENTIK_SECRET_KEY"] == "new-secret-key"
 
 
 class TestCollectStatusEvent:
