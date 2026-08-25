@@ -8,8 +8,9 @@ summary: Operator for Authentik Worker
 description: |
     Operator for Authentik Worker
 links:
-  source: https://github.com/canonical/authenik-worker-operator
-  issues: https://github.com/canonical/authenik-worker-operator/issues
+  documentation: https://canonical-identity.readthedocs-hosted.com/authentik/reference/charms/authentik-worker/
+  source: https://github.com/canonical/authentik-worker-operator
+  issues: https://github.com/canonical/authentik-worker-operator/issues
 
 charm-user: non-root
 platforms:
