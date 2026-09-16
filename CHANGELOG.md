@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0](https://github.com/canonical/authentik-worker-operator/compare/v1.1.0...v1.2.0) (2026-09-16)
+
+
+### Features
+
+* add arm64 support ([#67](https://github.com/canonical/authentik-worker-operator/issues/67)) ([2b8cc6c](https://github.com/canonical/authentik-worker-operator/commit/2b8cc6cecd98375c129e9bde4dad7a22d13de76f))
+* support arm64 ([1b323e0](https://github.com/canonical/authentik-worker-operator/commit/1b323e0d37b8e8677bb35a73b4afebea6553658d))
+
+
+### Bug Fixes
+
+* **authentik_cluster:** stop re-issuing the secret-backend token every hook ([ce6e9b5](https://github.com/canonical/authentik-worker-operator/commit/ce6e9b5be23d5790a64a7aaae57d75b1f7706886))
+* **deps:** update dependency lightkube-models to ~=1.37.0.8 ([6650416](https://github.com/canonical/authentik-worker-operator/commit/665041621e5748a303c50083b037298f092e3302))
+* **deps:** update dependency lightkube-models to ~=1.37.0.8 ([#63](https://github.com/canonical/authentik-worker-operator/issues/63)) ([91cc129](https://github.com/canonical/authentik-worker-operator/commit/91cc129dc27775057c67d9954a7be79c0e846d41))
+* **terraform:** declare a minimum Juju provider version ([#54](https://github.com/canonical/authentik-worker-operator/issues/54)) ([a0e6019](https://github.com/canonical/authentik-worker-operator/commit/a0e6019c44c67052e682d7214d91f228fd487705))
+* **terraform:** declare a minimum Juju provider version, not a pessimistic one ([bfca331](https://github.com/canonical/authentik-worker-operator/commit/bfca331e849c30d1561cbf29b6bfd37c236daa19))
+
 ## [1.1.0](https://github.com/canonical/authentik-worker-operator/compare/v1.0.1...v1.1.0) (2026-08-19)
 
 
