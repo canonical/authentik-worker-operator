@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/canonical/authentik-worker-operator/compare/v1.2.0...v1.2.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* disable ccc on publish ([4b57676](https://github.com/canonical/authentik-worker-operator/commit/4b57676fdb847aabce10468f3a4b2ba18b8b8c0d))
+* disable ccc on publish ([#69](https://github.com/canonical/authentik-worker-operator/issues/69)) ([77546cd](https://github.com/canonical/authentik-worker-operator/commit/77546cd313ca3744d7279f71f65029a3474bacea))
+
 ## [1.2.0](https://github.com/canonical/authentik-worker-operator/compare/v1.1.0...v1.2.0) (2026-09-16)
 
 
