@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.2](https://github.com/canonical/authentik-worker-operator/compare/v1.2.1...v1.2.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* **deps:** update dependency cosl to ~=1.11.3 ([f7abf5c](https://github.com/canonical/authentik-worker-operator/commit/f7abf5cbfd9db644f773336eced8b5e4bb590af5))
+* **deps:** update dependency cosl to ~=1.11.3 ([#73](https://github.com/canonical/authentik-worker-operator/issues/73)) ([98d1584](https://github.com/canonical/authentik-worker-operator/commit/98d1584bf6fccaeb671d8b5c3b5b9fc462bbb7a1))
+* **deps:** update dependency pydantic to ~=2.14.1 ([d960cd4](https://github.com/canonical/authentik-worker-operator/commit/d960cd46027d88f13062d09a9cedd0760d46ef2c))
+* **deps:** update dependency pydantic to ~=2.14.1 ([#75](https://github.com/canonical/authentik-worker-operator/issues/75)) ([a99d6be](https://github.com/canonical/authentik-worker-operator/commit/a99d6be97743c5bcb383aaee4332787200d2c702))
+
 ## [1.2.1](https://github.com/canonical/authentik-worker-operator/compare/v1.2.0...v1.2.1) (2026-09-17)
 
 
